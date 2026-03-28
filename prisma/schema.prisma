@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// User ka basic profile
+model UserProfile {
+  id          String   @id @default(cuid())
+  name        String
+  pan         String   @unique
+  aadhaar     String?
+  dob         DateTime
+  email       String   @unique
+  phone       String
+  password    String?
+  itrType     String   @default("ITR-1") // ITR-1 ya ITR-4
+  assessYear  String   @default("2025-26")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  incomes     Income[]
+  expenses    Expense[]
+  investments Investment[]
+  tdsRecords  TDSRecord[]
+  computations TaxComputation[]
+}
+
+// Income sources — salary, business, rent, FD
+model Income {
+  id          String   @id @default(cuid())
+  type        String   // SALARY, BUSINESS, RENT, FD, OTHER
+  source      String   // Employer name / tenant name
+  amount      Float
+  period      String   // "2025-26"
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Business expenses — only for ITR-4
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // RENT, SALARY, TRAVEL, EQUIPMENT, OTHER
+  description String
+  amount      Float
+  date        DateTime
+  receipt     String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Investments for deductions — 80C, 80D, 80G
+model Investment {
+  id          String   @id @default(cuid())
+  section     String   // 80C, 80D, 80G, 80E, HRA
+  type        String   // LIC, PPF, ELSS, MEDICLAIM, etc
+  amount      Float
+  maxLimit    Float    // Max allowed under that section
+  period      String
+  proofPath   String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// TDS deducted by employer or bank
+model TDSRecord {
+  id          String   @id @default(cuid())
+  deductor    String   // Employer/Bank name
+  tan         String?  // TAN of deductor
+  totalIncome Float
+  tdsAmount   Float
+  period      String
+  form        String   @default("16") // Form 16, 16A, 26AS
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Final tax computation result
+model TaxComputation {
+  id                  String   @id @default(cuid())
+  period              String
+  grossIncome         Float
+  standardDeduction   Float    @default(75000)
+  totalDeductions     Float
+  taxableIncome       Float
+  taxAmount           Float
+  surcharge           Float    @default(0)
+  cess                Float    // 4% health & education cess
+  totalTax            Float
+  tdsPaid             Float
+  taxPayable          Float    // Positive = pay, Negative = refund
+  regime              String   @default("NEW") // OLD or NEW tax regime
+  createdAt           DateTime @default(now())
+
+  userId              String
+  user                UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
